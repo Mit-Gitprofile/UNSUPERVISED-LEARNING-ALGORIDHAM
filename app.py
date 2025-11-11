@@ -69,6 +69,18 @@ if not price_col:
     price_col = "Price"
 
 # ------------------------------------------------
+# 🧹 Clean and Convert Price Column
+# ------------------------------------------------
+if price_col in df.columns:
+    df[price_col] = (
+        df[price_col]
+        .astype(str)
+        .str.replace(r'[^\d.]', '', regex=True)  # remove ₹, commas, etc.
+        .replace('', '0')
+        .astype(float)
+    )
+
+# ------------------------------------------------
 # Ensure Cluster Column Exists
 # ------------------------------------------------
 if 'Cluster' not in df.columns and all(col in df.columns for col in numeric_features):
@@ -83,6 +95,16 @@ for col in df.columns:
     if any(x in col.lower() for x in ['image', 'img', 'url', 'link']):
         image_column = col
         break
+
+# ------------------------------------------------
+# Extract company names
+# ------------------------------------------------
+def extract_company(name):
+    if isinstance(name, str):
+        return name.split()[0].capitalize()
+    return "Unknown"
+
+df['Company'] = df[name_col].apply(extract_company)
 
 # ------------------------------------------------
 # Display Top 50 Mobiles
@@ -104,22 +126,11 @@ for row_idx in range(rows):
                 st.image("https://via.placeholder.com/150?text=No+Image", width=img_width)
 
             st.markdown(f"**{data[name_col]}**")
-            st.markdown(f"⭐ **Rating:** {data[rating_col]}")
-            st.markdown(f"💰 **Price:** {data[price_col]}")
+            st.markdown(f"⭐ **Rating:** {data[rating_col]}**")
+            st.markdown(f"💰 **Price:** ₹{int(data[price_col])}**")
 
 # ------------------------------------------------
-# Extract company names
-# ------------------------------------------------
-def extract_company(name):
-    if isinstance(name, str):
-        return name.split()[0].capitalize()
-    return "Unknown"
-
-df['Company'] = df[name_col].apply(extract_company)
-companies = sorted(df['Company'].unique())
-
-# ------------------------------------------------
-# 🔍 Advanced Search Bar
+# 🔍 Advanced Search Bar (Enhanced)
 # ------------------------------------------------
 st.markdown("---")
 st.subheader("🔎 Advanced Search")
@@ -130,30 +141,33 @@ search_option = st.selectbox(
     index=0
 )
 
-
 # ------------------------------------------------
-# 🎯 Dynamic Recommendation Section
+# 🎯 Smart Recommendation (Improved Version)
 # ------------------------------------------------
 st.markdown("---")
 st.subheader("🎯 Smart Recommendation")
 
+# ----- 1️⃣ Search by Brand (Name) -----
 if search_option == "Name":
-    st.info("Recommendations will be based on similar names.")
-    selected_name = st.selectbox(
-        "Select a Mobile Name:",
-        options=[""] + sorted(df[name_col].dropna().unique().tolist())
+    st.info("Recommendations will be based on the selected mobile brand.")
+
+    # Extract only unique brand names (first word of each model name)
+    brand_names = sorted(df['Company'].unique())
+
+    selected_brand = st.selectbox(
+        "Select a Brand:",
+        options=[""] + brand_names
     )
 
-    if st.button("🔍 Recommend Similar Names"):
-        if not selected_name:
-            st.warning("Please select a mobile name first!")
+    if st.button("🔍 Recommend by Brand"):
+        if not selected_brand:
+            st.warning("Please select a brand first!")
         else:
-            keyword = selected_name.split()[0].lower()
-            rec_df = df[df[name_col].str.lower().str.contains(keyword)]
+            rec_df = df[df['Company'].str.lower() == selected_brand.lower()]
             if rec_df.empty:
-                st.error("No similar mobiles found.")
+                st.error("No mobiles found for this brand.")
             else:
-                st.markdown(f"### 🔍 Mobiles similar to **{selected_name}**")
+                st.markdown(f"### 🔍 Mobiles from **{selected_brand}**")
                 rec_cols = st.columns(5)
                 for i, (_, rec) in enumerate(rec_df.head(10).iterrows()):
                     with rec_cols[i % 5]:
@@ -162,18 +176,21 @@ if search_option == "Name":
                         else:
                             st.image("https://via.placeholder.com/150?text=No+Image", width=img_width)
                         st.markdown(f"**{rec[name_col]}**")
-                        st.markdown(f"⭐ **Rating:** {rec[rating_col]}")
-                        st.markdown(f"💰 **Price:** {rec[price_col]}")
+                        st.markdown(f"⭐ **Rating:** {rec[rating_col]}**")
+                        st.markdown(f"💰 **Price:** ₹{int(rec[price_col])}**")
 
+# ----- 2️⃣ Search by Rating -----
 elif search_option == "Rating":
-    st.info("Recommendations will be based on similar ratings.")
+    st.info("Recommendations will be based on mobile ratings (1–5).")
+
+    rating_options = [1, 2, 3, 4, 5]
     selected_rating = st.selectbox(
-        "Select a Rating:",
-        options=sorted(df[rating_col].dropna().unique().tolist())
+        "Select Rating:",
+        options=rating_options
     )
 
     if st.button("🔁 Recommend by Rating"):
-        rec_df = df[df[rating_col] == selected_rating]
+        rec_df = df[df[rating_col].round() == selected_rating]
         if rec_df.empty:
             st.error("No mobiles found with this rating.")
         else:
@@ -186,22 +203,27 @@ elif search_option == "Rating":
                     else:
                         st.image("https://via.placeholder.com/150?text=No+Image", width=img_width)
                     st.markdown(f"**{rec[name_col]}**")
-                    st.markdown(f"⭐ **Rating:** {rec[rating_col]}")
-                    st.markdown(f"💰 **Price:** {rec[price_col]}")
+                    st.markdown(f"⭐ **Rating:** {rec[rating_col]}**")
+                    st.markdown(f"💰 **Price:** ₹{int(rec[price_col])}**")
 
+# ----- 3️⃣ Search by Price -----
 elif search_option == "Price":
-    st.info("Recommendations will be based on similar prices.")
+    st.info("Recommendations will be based on price ranges.")
+
+    # Define simple price range options
+    price_options = [5000, 10000, 15000, 20000, 25000, 30000,
+                     40000, 50000, 60000, 80000, 100000]
     selected_price = st.selectbox(
-        "Select a Price Range (less than or equal to):",
-        options=sorted(df[price_col].dropna().unique().tolist())
+        "Select Maximum Price (≤):",
+        options=price_options
     )
 
     if st.button("🔁 Recommend by Price"):
         rec_df = df[df[price_col] <= selected_price]
         if rec_df.empty:
-            st.error("No mobiles found under this price.")
+            st.error("No mobiles found under this price range.")
         else:
-            st.markdown(f"###  Mobiles with Price ≤ **{selected_price}**")
+            st.markdown(f"### 💰 Mobiles priced ≤ **₹{selected_price}**")
             rec_cols = st.columns(5)
             for i, (_, rec) in enumerate(rec_df.head(10).iterrows()):
                 with rec_cols[i % 5]:
@@ -210,5 +232,5 @@ elif search_option == "Price":
                     else:
                         st.image("https://via.placeholder.com/150?text=No+Image", width=img_width)
                     st.markdown(f"**{rec[name_col]}**")
-                    st.markdown(f"⭐ **Rating:** {rec[rating_col]}")
-                    st.markdown(f"💰 **Price:** {rec[price_col]}")
+                    st.markdown(f"⭐ **Rating:** {rec[rating_col]}**")
+                    st.markdown(f"💰 **Price:** ₹{int(rec[price_col])}**")
