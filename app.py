@@ -22,7 +22,8 @@ try:
     with open("model.pkl", "rb") as file:
         model, scaler, numeric_features = pickle.load(file)
 
-    dataset_path = "F:\\Github_Desktop\\UNSUPERVISED-LEARNING-ALGORIDHAM\\mobile_recommendation_system_dataset copy.csv"
+    dataset_path = os.path.join(os.path.dirname(__file__), "mobile_recommendation_system_dataset copy.csv")
+
     if not os.path.exists(dataset_path):
         st.error("❌ Dataset not found in the folder.")
         st.stop()
